@@ -1,3 +1,29 @@
+/*
+ * TextStudio
+ *
+ * Copyright (c) 2026 Power
+ *
+ * MIT License
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 import SwiftUI
 import SwiftData
 import AppKit
@@ -8,34 +34,40 @@ struct TextStudioApp: App {
     @AppStorage("theme") private var theme: AppTheme = .dark
 
     init() {
-        // Store lives at ~/Library/Application Support/TextStudio/Notes.store (SQLite)
+        /* Store lives at ~/Library/Application Support/TextStudio/Notes.store (SQLite) */
         let dir = URL.applicationSupportDirectory.appending(path: "TextStudio", directoryHint: .isDirectory)
         Self.migrateFromMarkdownNotes(to: dir)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let config = ModelConfiguration(url: dir.appending(path: "Notes.store"))
+
         do {
             container = try ModelContainer(for: Note.self, configurations: config)
         } catch {
             fatalError("Could not open notes database: \(error)")
         }
+
         NSApplication.shared.setActivationPolicy(.regular)
         ZoomKeyMonitor.install()
     }
 
-    /// One-time move of data and settings from the app's old name ("MarkdownNotes").
+    /** One-time move of data and settings from the app's old name ("MarkdownNotes"). */
     private static func migrateFromMarkdownNotes(to newDir: URL) {
         let fm = FileManager.default
         let oldDir = URL.applicationSupportDirectory.appending(path: "MarkdownNotes", directoryHint: .isDirectory)
+
         if fm.fileExists(atPath: oldDir.path), !fm.fileExists(atPath: newDir.path) {
             try? fm.moveItem(at: oldDir, to: newDir)
         }
+
         let defaults = UserDefaults.standard
+
         if !defaults.bool(forKey: "migratedFromMarkdownNotes"),
            let old = UserDefaults(suiteName: "local.markdownnotes")?.persistentDomain(forName: "local.markdownnotes") {
             for key in ["theme", "fontSize", "tintOpacity", "editorMode"] {
                 if let value = old[key] { defaults.set(value, forKey: key) }
             }
         }
+
         defaults.set(true, forKey: "migratedFromMarkdownNotes")
     }
 
@@ -67,6 +99,7 @@ struct AppCommands: Commands {
             }
             .keyboardShortcut("n")
         }
+
         CommandGroup(after: .toolbar) {
             Button("Zoom In") { fontSize = Prefs.clamp(fontSize + 1) }
                 .keyboardShortcut("+")
@@ -78,22 +111,25 @@ struct AppCommands: Commands {
             Picker("Appearance", selection: $theme) {
                 ForEach(AppTheme.allCases) { Text($0.label).tag($0) }
             }
+
             Divider()
         }
     }
 }
 
-/// Lets ⌘= (unshifted, as in browsers) zoom in too, alongside the ⌘+ menu item.
+/** Lets ⌘= (unshifted, as in browsers) zoom in too, alongside the ⌘+ menu item. */
 enum ZoomKeyMonitor {
     static func install() {
         NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
             let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+
             if mods == .command, event.charactersIgnoringModifiers == "=" {
                 let d = UserDefaults.standard
                 let current = d.object(forKey: "fontSize") as? Double ?? Prefs.defaultFontSize
                 d.set(Prefs.clamp(current + 1), forKey: "fontSize")
                 return nil
             }
+
             return event
         }
     }
@@ -116,6 +152,7 @@ struct SettingsView: View {
                     Text("\(Int(fontSize)) pt").monospacedDigit().frame(width: 44, alignment: .trailing)
                 }
             }
+
             LabeledContent("Transparency") {
                 HStack {
                     Text("Clear").font(.caption).foregroundStyle(.secondary)

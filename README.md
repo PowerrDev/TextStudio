@@ -71,3 +71,7 @@ Sources/TextStudio/
   Note.swift               SwiftData model
   Theme.swift              Palettes, fonts, frosted background
 ```
+
+## License
+
+TextStudio is released under the [MIT License](LICENSE). Copyright (c) 2026 Power.
