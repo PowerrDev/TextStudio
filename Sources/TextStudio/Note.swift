@@ -26,17 +26,23 @@
 
 import Foundation
 import SwiftData
+import SwiftUI
+import UniformTypeIdentifiers
 
 @Model
 final class Note {
     var body: String
     var createdAt: Date
     var updatedAt: Date
+    var tags: [String] = []
+    var folder: Folder?
 
-    init(body: String = "") {
+    init(body: String = "", tags: [String] = [], folder: Folder? = nil) {
         self.body = body
         self.createdAt = .now
         self.updatedAt = .now
+        self.tags = tags
+        self.folder = folder
     }
 
     /** First non-empty line, stripped of leading markdown heading markers. */
@@ -53,4 +59,66 @@ final class Note {
 
         return lines.count > 1 ? String(lines[1]) : ""
     }
+
+    // MARK: Tags
+
+    /** Lowercased, without a leading `#`, whitespace collapsed to `-`. Nil if empty. */
+    static func normalizeTag(_ raw: String) -> String? {
+        let s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            .drop(while: { $0 == "#" })
+            .lowercased()
+        let tag = s.split(whereSeparator: \.isWhitespace).joined(separator: "-")
+
+        return tag.isEmpty ? nil : tag
+    }
+
+    func addTag(_ raw: String) {
+        guard let tag = Self.normalizeTag(raw), !tags.contains(tag) else { return }
+        tags.append(tag)
+        updatedAt = .now
+    }
+
+    func removeTag(_ tag: String) {
+        tags.removeAll { $0 == tag }
+        updatedAt = .now
+    }
+
+    // MARK: Duplicate
+
+    /** The body with " copy" appended to its first non-empty (title) line. */
+    var duplicatedBody: String {
+        var lines = body.components(separatedBy: "\n")
+
+        if let i = lines.firstIndex(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }) {
+            lines[i] += " copy"
+        }
+
+        return lines.joined(separator: "\n")
+    }
+}
+
+@Model
+final class Folder {
+    var name: String
+    var createdAt: Date
+    /** Deleting a folder keeps its notes; they just lose their folder. */
+    @Relationship(deleteRule: .nullify, inverse: \Note.folder) var notes: [Note]? = []
+
+    init(name: String) {
+        self.name = name
+        self.createdAt = .now
+    }
+}
+
+/** Drag payload for moving a note onto a folder in the sidebar. */
+struct NoteRef: Codable, Transferable {
+    let id: PersistentIdentifier
+
+    static var transferRepresentation: some TransferRepresentation {
+        CodableRepresentation(contentType: .textStudioNote)
+    }
+}
+
+extension UTType {
+    static let textStudioNote = UTType(exportedAs: "local.textstudio.note")
 }
