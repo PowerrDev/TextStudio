@@ -31,6 +31,8 @@ import AppKit
 @main
 struct TextStudioApp: App {
     let container: ModelContainer
+    /** Most recently edited note, looked up at launch so the first window opens with it. */
+    private let initialNote: Note?
     @AppStorage("theme") private var theme: AppTheme = .dark
 
     init() {
@@ -46,7 +48,16 @@ struct TextStudioApp: App {
             fatalError("Could not open notes database: \(error)")
         }
 
+        var recent = FetchDescriptor<Note>(sortBy: [SortDescriptor(\.updatedAt, order: .reverse)])
+        recent.fetchLimit = 1
+        initialNote = try? container.mainContext.fetch(recent).first
         NSApplication.shared.setActivationPolicy(.regular)
+        /*
+         * Apply the theme before any window exists. Doing it on appear switched the
+         * appearance after the first draw and made every view render twice.
+         */
+        let saved = UserDefaults.standard.string(forKey: "theme") ?? ""
+        (AppTheme(rawValue: saved) ?? .dark).apply()
         ZoomKeyMonitor.install()
     }
 
@@ -73,9 +84,8 @@ struct TextStudioApp: App {
 
     var body: some Scene {
         WindowGroup("TextStudio") {
-            ContentView()
+            ContentView(initialSelection: initialNote)
                 .frame(minWidth: 900, minHeight: 500)
-                .onAppear { theme.apply() }
                 .onChange(of: theme) { theme.apply() }
         }
         .defaultSize(width: 1200, height: 750)

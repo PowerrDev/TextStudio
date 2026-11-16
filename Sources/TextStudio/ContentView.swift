@@ -93,6 +93,11 @@ struct ContentView: View {
 
     @Environment(\.colorScheme) private var scheme
 
+    /** `initialSelection` opens that note in the very first render instead of a second pass. */
+    init(initialSelection: Note? = nil) {
+        _selection = State(initialValue: initialSelection)
+    }
+
     /** Every tag in use with its note count, alphabetical. */
     private var tagCounts: [(tag: String, count: Int)] {
         var counts: [String: Int] = [:]
