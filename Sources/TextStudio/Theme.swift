@@ -165,3 +165,37 @@ struct FrostedBackground: NSViewRepresentable {
         v.material = material
     }
 }
+
+/**
+ * The window's single frosted-glass layer. Applied once behind the whole split
+ * view; glass views are costly to create, so the columns share this one.
+ */
+struct WindowGlass: ViewModifier {
+    @Environment(\.colorScheme) private var scheme
+
+    func body(content: Content) -> some View {
+        content.background {
+            FrostedBackground(material: scheme == .dark ? .hudWindow : .underWindowBackground)
+                .ignoresSafeArea()
+        }
+    }
+}
+
+/** The theme tint over the glass, at the opacity set in Settings → Transparency. */
+struct ThemeTint: ViewModifier {
+    @Environment(\.colorScheme) private var scheme
+
+    @AppStorage("tintOpacity") private var tintOpacity = 0.55
+
+    func body(content: Content) -> some View {
+        content.background {
+            Palette.forScheme(scheme).background.opacity(tintOpacity)
+                .ignoresSafeArea()
+        }
+    }
+}
+
+extension View {
+    func windowGlass() -> some View { modifier(WindowGlass()) }
+    func themeTint() -> some View { modifier(ThemeTint()) }
+}

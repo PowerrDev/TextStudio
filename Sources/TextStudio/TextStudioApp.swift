@@ -41,7 +41,7 @@ struct TextStudioApp: App {
         let config = ModelConfiguration(url: dir.appending(path: "Notes.store"))
 
         do {
-            container = try ModelContainer(for: Note.self, configurations: config)
+            container = try ModelContainer(for: Note.self, Folder.self, TagColor.self, configurations: config)
         } catch {
             fatalError("Could not open notes database: \(error)")
         }
@@ -92,12 +92,31 @@ struct AppCommands: Commands {
     @AppStorage("fontSize") private var fontSize = Prefs.defaultFontSize
     @AppStorage("theme") private var theme: AppTheme = .dark
 
+    @FocusedValue(\.noteActions) private var actions
+
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
-            Button("New Note") {
-                NotificationCenter.default.post(name: .newNote, object: nil)
+            Button("New Note") { actions?.newNote() }
+                .keyboardShortcut("n")
+                .disabled(actions == nil)
+            Button("New Folder") { actions?.newFolder() }
+                .keyboardShortcut("n", modifiers: [.command, .shift])
+                .disabled(actions == nil)
+            Button("Duplicate Note") { actions?.duplicate?() }
+                .keyboardShortcut("d")
+                .disabled(actions?.duplicate == nil)
+            Divider()
+            Button("Export as PDF…") { actions?.exportPDF?() }
+                .keyboardShortcut("e", modifiers: [.command, .shift])
+                .disabled(actions?.exportPDF == nil)
+        }
+
+        CommandGroup(after: .sidebar) {
+            Button(actions?.noteListVisible == false ? "Show Note List" : "Hide Note List") {
+                actions?.toggleNoteList()
             }
-            .keyboardShortcut("n")
+            .keyboardShortcut("l", modifiers: [.command, .option])
+            .disabled(actions == nil)
         }
 
         CommandGroup(after: .toolbar) {
@@ -165,8 +184,4 @@ struct SettingsView: View {
         .frame(width: 420)
         .fixedSize()
     }
-}
-
-extension Notification.Name {
-    static let newNote = Notification.Name("TextStudio.newNote")
 }

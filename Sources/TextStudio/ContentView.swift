@@ -39,66 +39,157 @@ enum EditorMode: String, CaseIterable, Identifiable {
     }
 }
 
+/** What the note list is showing. */
+enum SidebarItem: Hashable {
+    case all
+    case folder(Folder)
+    case tag(String)
+}
+
+/** Text-entry alerts for naming folders and tags. */
+enum NamePrompt {
+    case newFolder
+    case renameFolder(Folder)
+    case renameTag(String)
+
+    var title: String {
+        switch self {
+        case .newFolder: "New Folder"
+        case .renameFolder: "Rename Folder"
+        case .renameTag: "Rename Tag"
+        }
+    }
+
+    var confirm: String {
+        if case .newFolder = self { return "Create" }
+        return "Rename"
+    }
+
+    var initial: String {
+        switch self {
+        case .newFolder: ""
+        case .renameFolder(let f): f.name
+        case .renameTag(let t): t
+        }
+    }
+}
+
 struct ContentView: View {
     @Environment(\.modelContext) private var context
 
     @Query(sort: \Note.updatedAt, order: .reverse) private var notes: [Note]
+    @Query(sort: \Folder.name) private var folders: [Folder]
+    @Query private var tagColors: [TagColor]
 
+    @State private var customColor: CustomColorTarget?
+    @State private var sidebar: SidebarItem? = .all
     @State private var selection: Note?
     @State private var search = ""
+    @State private var prompt: NamePrompt?
+    @State private var promptText = ""
 
     @AppStorage("editorMode") private var mode: EditorMode = .split
+    @AppStorage("showNoteList") private var showNoteList = true
 
     @Environment(\.colorScheme) private var scheme
 
+    /** Every tag in use with its note count, alphabetical. */
+    private var tagCounts: [(tag: String, count: Int)] {
+        var counts: [String: Int] = [:]
+
+        for note in notes { for tag in note.tags { counts[tag, default: 0] += 1 } }
+        return counts
+            .sorted { $0.key.localizedStandardCompare($1.key) == .orderedAscending }
+            .map { (tag: $0.key, count: $0.value) }
+    }
+
+    private var tagHexes: [String: Int] {
+        Dictionary(tagColors.map { ($0.tag, $0.hex) }, uniquingKeysWith: { a, _ in a })
+    }
+
+    private func tagColor(_ tag: String) -> Color {
+        tagHexes[tag].map { Color(hex: UInt32($0)) } ?? Palette.forScheme(scheme).accent
+    }
+
+    private func pickCustomColor(_ tag: String) {
+        customColor = CustomColorTarget(tag: tag, initial: tagColor(tag))
+    }
+
+    private var scoped: [Note] {
+        switch sidebar ?? .all {
+        case .all: notes
+        case .folder(let f): notes.filter { $0.folder == f }
+        case .tag(let t): notes.filter { $0.tags.contains(t) }
+        }
+    }
+
     private var filtered: [Note] {
-        guard !search.isEmpty else { return notes }
-        return notes.filter { $0.body.localizedCaseInsensitiveContains(search) }
+        guard !search.isEmpty else { return scoped }
+        let tagQuery = search.hasPrefix("#") ? String(search.dropFirst()) : search
+
+        return scoped.filter { note in
+            note.body.localizedCaseInsensitiveContains(search)
+                || (!tagQuery.isEmpty && note.tags.contains { $0.localizedCaseInsensitiveContains(tagQuery) })
+        }
+    }
+
+    private var listTitle: String {
+        switch sidebar ?? .all {
+        case .all: "All Notes"
+        case .folder(let f): f.name
+        case .tag(let t): "#" + t
+        }
+    }
+
+    /** Three columns, or two when the note list is hidden. */
+    @ViewBuilder
+    private var splitView: some View {
+        if showNoteList {
+            NavigationSplitView {
+                sidebarList
+            } content: {
+                noteList
+            } detail: {
+                detail
+            }
+        } else {
+            NavigationSplitView {
+                sidebarList
+            } detail: {
+                detail
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var detail: some View {
+        if let note = selection {
+            NoteDetailView(note: note, mode: mode, allTags: tagCounts.map(\.tag), tagHexes: tagHexes)
+                .id(note.persistentModelID)
+        } else {
+            ContentUnavailableView("No Note Selected", systemImage: "note.text",
+                                   description: Text("Press ⌘N to create a note."))
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .themeTint()
+        }
     }
 
     var body: some View {
-        NavigationSplitView {
-            List(selection: $selection) {
-                ForEach(filtered) { note in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(note.title).font(.headline).lineLimit(1)
-                        HStack {
-                            Text(note.updatedAt, format: .dateTime.month().day().hour().minute())
-                            Text(note.snippet).lineLimit(1)
-                        }
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 2)
-                    .tag(note)
-                    .contextMenu {
-                        Button("Delete", role: .destructive) { delete(note) }
-                    }
-                }
-                .onDelete { offsets in
-                    offsets.map { filtered[$0] }.forEach(delete)
-                }
-            }
-            .searchable(text: $search, placement: .sidebar)
-            .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 400)
-            .toolbar {
-                ToolbarItem {
-                    Button(action: addNote) { Label("New Note", systemImage: "square.and.pencil") }
-                }
-            }
-            .onDeleteCommand {
-                if let selection { delete(selection) }
-            }
-        } detail: {
-            if let note = selection {
-                NoteDetailView(note: note, mode: mode)
-                    .id(note.persistentModelID)
-            } else {
-                ContentUnavailableView("No Note Selected", systemImage: "note.text",
-                                       description: Text("Press ⌘N to create a note."))
-            }
-        }
+        splitView
+        .windowGlass()
+        /* Let the frosted panes show through behind the toolbar instead of its opaque bar. */
+        .toolbarBackground(.hidden, for: .windowToolbar)
         .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button {
+                    withAnimation { showNoteList.toggle() }
+                } label: {
+                    Label(showNoteList ? "Hide Note List" : "Show Note List",
+                          systemImage: "list.bullet.rectangle")
+                }
+                .help(showNoteList ? "Hide Note List (⌥⌘L)" : "Show Note List (⌥⌘L)")
+            }
+
             ToolbarItem(placement: .primaryAction) {
                 Picker("Mode", selection: $mode) {
                     ForEach(EditorMode.allCases) { m in
@@ -108,74 +199,352 @@ struct ContentView: View {
                 .pickerStyle(.segmented)
                 .disabled(selection == nil)
             }
+
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    if let selection { PDFExporter.export(selection) }
+                } label: {
+                    Label("Export as PDF", systemImage: "arrow.down.doc")
+                }
+                .help("Export as PDF (⇧⌘E)")
+                .disabled(selection == nil)
+            }
         }
         .tint(Palette.forScheme(scheme).accent)
-        .onReceive(NotificationCenter.default.publisher(for: .newNote)) { _ in addNote() }
-        .onAppear { if selection == nil { selection = notes.first } }
+        .focusedSceneValue(\.noteActions, NoteActions(
+            newNote: addNote,
+            newFolder: { ask(.newFolder) },
+            toggleNoteList: { withAnimation { showNoteList.toggle() } },
+            noteListVisible: showNoteList,
+            duplicate: selection.map { note in { duplicate(note) } },
+            exportPDF: selection.map { note in { PDFExporter.export(note) } }
+        ))
+        .alert(prompt?.title ?? "", isPresented: Binding(
+            get: { prompt != nil },
+            set: { if !$0 { prompt = nil } }
+        ), presenting: prompt) { p in
+            TextField("Name", text: $promptText)
+            Button(p.confirm) { apply(p) }
+            Button("Cancel", role: .cancel) {}
+        }
+        .sheet(item: $customColor) { target in
+            CustomTagColorSheet(tag: target.tag, color: target.initial)
+        }
+        .onAppear {
+            if selection == nil { selection = notes.first }
+        }
+        .onChange(of: sidebar) {
+            if let selection, filtered.contains(selection) { return }
+            selection = filtered.first
+        }
     }
 
+    // MARK: - Columns
+
+    private var sidebarList: some View {
+        List(selection: nativeSidebarSelection) {
+            Label("All Notes", systemImage: "tray.full")
+                .badge(notes.count)
+                .tag(SidebarItem.all)
+                .dropDestination(for: NoteRef.self) { refs, _ in move(refs, to: nil) }
+
+            Section {
+                ForEach(folders) { folder in
+                    Label(folder.name, systemImage: "folder")
+                        .badge(notes.filter { $0.folder == folder }.count)
+                        .tag(SidebarItem.folder(folder))
+                        .dropDestination(for: NoteRef.self) { refs, _ in move(refs, to: folder) }
+                        .contextMenu {
+                            Button("Rename…") { ask(.renameFolder(folder)) }
+                            Button("Delete Folder", role: .destructive) { deleteFolder(folder) }
+                        }
+                }
+            } header: {
+                HStack {
+                    Text("Folders")
+                    Spacer()
+                    Button { ask(.newFolder) } label: { Image(systemName: "plus") }
+                        .buttonStyle(.borderless)
+                        .help("New Folder (⇧⌘N)")
+                }
+            }
+
+            if !tagCounts.isEmpty {
+                Section("Tags") {
+                    ForEach(tagCounts, id: \.tag) { item in
+                        tagRow(item.tag, count: item.count)
+                            .contextMenu {
+                                TagColorMenu(tag: item.tag, current: tagHexes[item.tag]) {
+                                    pickCustomColor(item.tag)
+                                }
+
+                                Button("Rename…") { ask(.renameTag(item.tag)) }
+                                Button("Remove from All Notes", role: .destructive) { deleteTag(item.tag) }
+                            }
+                    }
+                }
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .themeTint()
+        .toolbarBackground(.hidden, for: .windowToolbar)
+        .navigationSplitViewColumnWidth(min: 170, ideal: 200, max: 300)
+    }
+
+    /**
+     * Tag rows draw their own highlight in the tag's color, so they stay out of
+     * the List's native (accent-colored) selection.
+     */
+    private var nativeSidebarSelection: Binding<SidebarItem?> {
+        Binding(
+            get: { if case .tag = sidebar { return nil } else { return sidebar } },
+            set: { if let new = $0 { sidebar = new } }
+        )
+    }
+
+    private func tagRow(_ tag: String, count: Int) -> some View {
+        let selected = sidebar == .tag(tag)
+        let color = tagColor(tag)
+
+        return HStack {
+            Label {
+                Text(tag)
+            } icon: {
+                Image(systemName: "number")
+                    .foregroundStyle(selected ? .white : color)
+            }
+
+            Spacer()
+            Text("\(count)")
+                .monospacedDigit()
+                .foregroundStyle(selected ? Color.white.opacity(0.85) : Color.secondary)
+        }
+        .foregroundStyle(selected ? Color.white : Color.primary)
+        .contentShape(Rectangle())
+        /*
+         * The row background spans the full row height, like the native highlight;
+         * the horizontal inset matches the native highlight's rounded shape.
+         */
+        .listRowBackground(
+            RoundedRectangle(cornerRadius: 5)
+                .fill(selected ? color : .clear)
+                .padding(.horizontal, 10)
+        )
+        .onTapGesture { sidebar = .tag(tag) }
+    }
+
+    private var noteList: some View {
+        List(selection: $selection) {
+            ForEach(filtered) { note in
+                noteRow(note)
+                    .tag(note)
+                    .draggable(NoteRef(id: note.persistentModelID))
+                    .contextMenu { noteMenu(note) }
+            }
+            .onDelete { offsets in
+                offsets.map { filtered[$0] }.forEach(delete)
+            }
+        }
+        .scrollContentBackground(.hidden)
+        .themeTint()
+        .toolbarBackground(.hidden, for: .windowToolbar)
+        .searchable(text: $search, placement: .sidebar)
+        .navigationTitle(listTitle)
+        .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 400)
+        .toolbar {
+            ToolbarItem {
+                Button(action: addNote) { Label("New Note", systemImage: "square.and.pencil") }
+            }
+        }
+        .onDeleteCommand {
+            if let selection { delete(selection) }
+        }
+    }
+
+    private func noteRow(_ note: Note) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(note.title).font(.headline).lineLimit(1)
+            HStack {
+                Text(note.updatedAt, format: .dateTime.month().day().hour().minute())
+                Text(note.snippet).lineLimit(1)
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            if !note.tags.isEmpty || (note.folder != nil && sidebar == .all) {
+                HStack(spacing: 6) {
+                    if let folder = note.folder, sidebar == .all {
+                        Label(folder.name, systemImage: "folder")
+                            .foregroundStyle(.secondary)
+                    }
+
+                    ForEach(note.tags, id: \.self) { tag in
+                        Text("#" + tag).foregroundStyle(tagColor(tag))
+                    }
+                }
+                .font(.caption2)
+                .lineLimit(1)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    @ViewBuilder
+    private func noteMenu(_ note: Note) -> some View {
+        Button("Duplicate") { duplicate(note) }
+        Menu("Move to Folder") {
+            Button("No Folder") { note.folder = nil; save() }
+                .disabled(note.folder == nil)
+            if !folders.isEmpty { Divider() }
+            ForEach(folders) { folder in
+                Button(folder.name) { note.folder = folder; save() }
+                    .disabled(note.folder == folder)
+            }
+        }
+
+        Button("Export as PDF…") { PDFExporter.export(note) }
+        Divider()
+        Button("Delete", role: .destructive) { delete(note) }
+    }
+
+    // MARK: - Notes
+
     private func addNote() {
-        let note = Note(body: "# New note\n\n")
+        var tags: [String] = []
+        var folder: Folder?
+
+        switch sidebar ?? .all {
+        case .all: break
+        case .folder(let f): folder = f
+        case .tag(let t): tags = [t]
+        }
+
+        let note = Note(body: "# New note\n\n", tags: tags, folder: folder)
         context.insert(note)
-        try? context.save()
+        save()
         search = ""
         selection = note
+    }
+
+    private func duplicate(_ note: Note) {
+        let copy = Note(body: note.duplicatedBody, tags: note.tags, folder: note.folder)
+        context.insert(copy)
+        save()
+        selection = copy
     }
 
     private func delete(_ note: Note) {
         if selection == note { selection = nil }
         context.delete(note)
-        try? context.save()
+        save()
     }
+
+    private func move(_ refs: [NoteRef], to folder: Folder?) -> Bool {
+        let moved = refs.compactMap { context.model(for: $0.id) as? Note }
+        moved.forEach { $0.folder = folder }
+        save()
+        return !moved.isEmpty
+    }
+
+    // MARK: - Folders & tags
+
+    private func ask(_ p: NamePrompt) {
+        promptText = p.initial
+        prompt = p
+    }
+
+    private func apply(_ p: NamePrompt) {
+        let name = promptText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        switch p {
+        case .newFolder:
+            guard !name.isEmpty else { return }
+            let folder = Folder(name: name)
+            context.insert(folder)
+            sidebar = .folder(folder)
+
+        case .renameFolder(let folder):
+            guard !name.isEmpty else { return }
+            folder.name = name
+
+        case .renameTag(let old):
+            guard let new = Note.normalizeTag(name), new != old else { return }
+            for note in notes where note.tags.contains(old) {
+                note.tags = note.tags.reduce(into: []) { result, t in
+                    let t = t == old ? new : t
+
+                    if !result.contains(t) { result.append(t) }
+                }
+            }
+
+            TagColor.rename(old, to: new, in: context)
+            if sidebar == .tag(old) { sidebar = .tag(new) }
+        }
+
+        save()
+    }
+
+    private func deleteFolder(_ folder: Folder) {
+        if sidebar == .folder(folder) { sidebar = .all }
+        context.delete(folder)   /* notes are kept (nullify) */
+        save()
+    }
+
+    private func deleteTag(_ tag: String) {
+        for note in notes where note.tags.contains(tag) { note.tags.removeAll { $0 == tag } }
+        TagColor.set(tag, hex: nil, in: context)
+        if sidebar == .tag(tag) { sidebar = .all }
+        save()
+    }
+
+    private func save() { try? context.save() }
 }
 
 struct NoteDetailView: View {
     @Bindable var note: Note
     let mode: EditorMode
+    let allTags: [String]
+    let tagHexes: [String: Int]
     @Environment(\.modelContext) private var context
     @Environment(\.colorScheme) private var scheme
 
     @AppStorage("fontSize") private var fontSize = Prefs.defaultFontSize
-    @AppStorage("tintOpacity") private var tintOpacity = 0.55
 
     @State private var pinchStart: Double?
 
     var body: some View {
         let palette = Palette.forScheme(scheme)
-        HStack(spacing: 0) {
-            if mode != .preview {
-                TextEditor(text: $note.body)
-                    .font(Fonts.mono(fontSize))
-                    .foregroundStyle(palette.text)
-                    .lineSpacing(fontSize * 0.25)
-                    .scrollContentBackground(.hidden)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-
-            if mode == .split {
-                Rectangle().fill(palette.secondary.opacity(0.25)).frame(width: 1)
-            }
-
-            if mode != .edit {
-                ScrollView {
-                    MarkdownView(text: note.body, fontSize: fontSize, palette: palette)
-                        .padding(20)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(spacing: 0) {
+            TagBar(note: note, allTags: allTags, tagHexes: tagHexes, palette: palette)
+            Rectangle().fill(palette.secondary.opacity(0.25)).frame(height: 1)
+            HStack(spacing: 0) {
+                if mode != .preview {
+                    TextEditor(text: $note.body)
+                        .font(Fonts.mono(fontSize))
+                        .foregroundStyle(palette.text)
+                        .lineSpacing(fontSize * 0.25)
+                        .scrollContentBackground(.hidden)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                if mode == .split {
+                    Rectangle().fill(palette.secondary.opacity(0.25)).frame(width: 1)
+                }
+
+                if mode != .edit {
+                    ScrollView {
+                        MarkdownView(text: note.body, fontSize: fontSize, palette: palette)
+                            .padding(20)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             }
         }
         .tint(palette.accent)
-        .background {
-            ZStack {
-                FrostedBackground(material: scheme == .dark ? .hudWindow : .underWindowBackground)
-                palette.background.opacity(tintOpacity)
-            }
-            .ignoresSafeArea()
-        }
-
+        .themeTint()
+        .toolbarBackground(.hidden, for: .windowToolbar)
         /* Trackpad pinch to zoom */
         .simultaneousGesture(
             MagnifyGesture()
@@ -191,5 +560,28 @@ struct NoteDetailView: View {
             note.updatedAt = .now
             try? context.save()
         }
+    }
+}
+
+// MARK: - Menu commands
+
+/** Actions the menu bar can trigger in the focused window. */
+struct NoteActions {
+    var newNote: () -> Void
+    var newFolder: () -> Void
+    var toggleNoteList: () -> Void
+    var noteListVisible: Bool
+    var duplicate: (() -> Void)?
+    var exportPDF: (() -> Void)?
+}
+
+private struct NoteActionsKey: FocusedValueKey {
+    typealias Value = NoteActions
+}
+
+extension FocusedValues {
+    var noteActions: NoteActions? {
+        get { self[NoteActionsKey.self] }
+        set { self[NoteActionsKey.self] = newValue }
     }
 }
