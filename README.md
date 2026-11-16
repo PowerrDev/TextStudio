@@ -1,4 +1,4 @@
-# Markdown Notes
+# TextStudio - Markdown Notes
 
 A small native macOS app for writing Markdown notes, built with SwiftUI and SwiftData. Notes are stored in a local SQLite database.
 
