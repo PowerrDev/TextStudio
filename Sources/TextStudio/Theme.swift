@@ -107,6 +107,22 @@ struct Palette {
         quoteBar: Color(hex: 0x93A1A1),
         check: Color(hex: 0x859900)
     )
+
+    /** Light palette on white paper, with darker body text for print. */
+    static let print = Palette(
+        background: .white,
+        text: Color(hex: 0x2E3D42),
+        secondary: Color(hex: 0x7A8B8C),
+        headings: light.headings,
+        accent: light.accent,
+        link: light.link,
+        code: Color(hex: 0x5A7300),
+        codeBackground: Color(hex: 0xF4F1E8),
+        bold: Color(hex: 0x073642),
+        italic: light.italic,
+        quoteBar: light.quoteBar,
+        check: light.check
+    )
 }
 
 extension Color {

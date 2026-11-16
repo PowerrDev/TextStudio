@@ -32,13 +32,29 @@ import SwiftUI
  * inline styling (bold, italic, code, links, strikethrough) to AttributedString.
  */
 struct MarkdownView: View {
-    let text: String
+    let blocks: [Block]
     var fontSize: Double = Prefs.defaultFontSize
     var palette: Palette = .dark
+    /** Lays out for static rendering (PDF): code blocks wrap instead of scrolling. */
+    var printable = false
+
+    init(text: String, fontSize: Double = Prefs.defaultFontSize, palette: Palette = .dark) {
+        self.init(blocks: Self.parse(text), fontSize: fontSize, palette: palette)
+    }
+
+    init(blocks: [Block], fontSize: Double = Prefs.defaultFontSize, palette: Palette = .dark, printable: Bool = false) {
+        self.blocks = blocks
+        self.fontSize = fontSize
+        self.palette = palette
+        self.printable = printable
+    }
+
+    /** Vertical gap between blocks. */
+    static func blockSpacing(_ fontSize: Double) -> Double { fontSize * 0.6 }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: fontSize * 0.6) {
-            ForEach(Array(Self.parse(text).enumerated()), id: \.offset) { _, block in
+        VStack(alignment: .leading, spacing: Self.blockSpacing(fontSize)) {
+            ForEach(Array(blocks.enumerated()), id: \.offset) { _, block in
                 view(for: block)
             }
         }
@@ -109,11 +125,12 @@ struct MarkdownView: View {
             }
 
         case .code(let s):
-            ScrollView(.horizontal, showsIndicators: false) {
-                Text(s)
-                    .font(Fonts.mono(fontSize * 0.95))
-                    .foregroundStyle(palette.text)
-                    .padding(12)
+            Group {
+                if printable {
+                    codeText(s).fixedSize(horizontal: false, vertical: true)
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) { codeText(s) }
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: 8).fill(palette.codeBackground.opacity(0.85)))
@@ -122,6 +139,13 @@ struct MarkdownView: View {
         case .rule:
             Rectangle().fill(palette.secondary.opacity(0.3)).frame(height: 1).padding(.vertical, 4)
         }
+    }
+
+    private func codeText(_ s: String) -> some View {
+        Text(s)
+            .font(Fonts.mono(fontSize * 0.95))
+            .foregroundStyle(palette.text)
+            .padding(12)
     }
 
     private func inline(_ s: String) -> Text {
