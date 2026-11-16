@@ -3,13 +3,14 @@ import SwiftData
 import AppKit
 
 @main
-struct MarkdownNotesApp: App {
+struct TextStudioApp: App {
     let container: ModelContainer
     @AppStorage("theme") private var theme: AppTheme = .dark
 
     init() {
-        // Store lives at ~/Library/Application Support/MarkdownNotes/Notes.store (SQLite)
-        let dir = URL.applicationSupportDirectory.appending(path: "MarkdownNotes", directoryHint: .isDirectory)
+        // Store lives at ~/Library/Application Support/TextStudio/Notes.store (SQLite)
+        let dir = URL.applicationSupportDirectory.appending(path: "TextStudio", directoryHint: .isDirectory)
+        Self.migrateFromMarkdownNotes(to: dir)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let config = ModelConfiguration(url: dir.appending(path: "Notes.store"))
         do {
@@ -21,8 +22,25 @@ struct MarkdownNotesApp: App {
         ZoomKeyMonitor.install()
     }
 
+    /// One-time move of data and settings from the app's old name ("MarkdownNotes").
+    private static func migrateFromMarkdownNotes(to newDir: URL) {
+        let fm = FileManager.default
+        let oldDir = URL.applicationSupportDirectory.appending(path: "MarkdownNotes", directoryHint: .isDirectory)
+        if fm.fileExists(atPath: oldDir.path), !fm.fileExists(atPath: newDir.path) {
+            try? fm.moveItem(at: oldDir, to: newDir)
+        }
+        let defaults = UserDefaults.standard
+        if !defaults.bool(forKey: "migratedFromMarkdownNotes"),
+           let old = UserDefaults(suiteName: "local.markdownnotes")?.persistentDomain(forName: "local.markdownnotes") {
+            for key in ["theme", "fontSize", "tintOpacity", "editorMode"] {
+                if let value = old[key] { defaults.set(value, forKey: key) }
+            }
+        }
+        defaults.set(true, forKey: "migratedFromMarkdownNotes")
+    }
+
     var body: some Scene {
-        WindowGroup("Markdown Notes") {
+        WindowGroup("TextStudio") {
             ContentView()
                 .frame(minWidth: 900, minHeight: 500)
                 .onAppear { theme.apply() }
@@ -113,5 +131,5 @@ struct SettingsView: View {
 }
 
 extension Notification.Name {
-    static let newNote = Notification.Name("MarkdownNotes.newNote")
+    static let newNote = Notification.Name("TextStudio.newNote")
 }

@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "MarkdownNotes",
+    name: "TextStudio",
     platforms: [.macOS(.v14)],
     targets: [
         .executableTarget(
-            name: "MarkdownNotes",
-            path: "Sources/MarkdownNotes"
+            name: "TextStudio",
+            path: "Sources/TextStudio"
         )
     ]
 )

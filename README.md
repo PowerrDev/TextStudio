@@ -21,10 +21,16 @@ A small native macOS app for writing Markdown notes, built with SwiftUI and Swif
 
 ```sh
 ./build-app.sh
-open MarkdownNotes.app
+open TextStudio.app
 ```
 
-`build-app.sh` builds a release binary with Swift Package Manager, wraps it in `MarkdownNotes.app` and ad-hoc signs it. Drag the app into `/Applications` to install it.
+`build-app.sh` builds a release binary with Swift Package Manager, wraps it in `TextStudio.app` with its icon and ad-hoc signs it. To build and install into `/Applications` in one step:
+
+```sh
+./build-app.sh --install
+```
+
+The app icon is `Resources/AppIcon.icns`, generated from `TextStudio.png`.
 
 For a quick debug run without building the app bundle:
 
@@ -48,7 +54,7 @@ swift run
 Notes are stored at:
 
 ```
-~/Library/Application Support/MarkdownNotes/Notes.store
+~/Library/Application Support/TextStudio/Notes.store
 ```
 
 To back up your notes, copy that file together with its `-shm` and `-wal` companions.
@@ -58,8 +64,8 @@ To back up your notes, copy that file together with its `-shm` and `-wal` compan
 ```
 Package.swift
 build-app.sh
-Sources/MarkdownNotes/
-  MarkdownNotesApp.swift   App entry, menu commands, settings
+Sources/TextStudio/
+  TextStudioApp.swift      App entry, menu commands, settings
   ContentView.swift        Sidebar, editor and preview layout
   MarkdownView.swift       Markdown parser and renderer
   Note.swift               SwiftData model
