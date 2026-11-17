@@ -246,7 +246,8 @@ struct ContentView: View {
             newFromTemplate: { addNote(body: $0.expanded()) },
             saveAsTemplate: selection.map { note in { ask(.saveTemplate(note)) } },
             deleteTemplate: deleteTemplate,
-            insertLink: selection.map { note in { beginInsertLink(into: note) } }
+            insertLink: selection.map { note in { beginInsertLink(into: note) } },
+            copyServerURL: selection.flatMap { note in NoteServer.url(for: note).map { url in { NoteLink.copy(url) } } }
         ))
         /* Clicking a note link in the preview opens that note. */
         .environment(\.openURL, OpenURLAction { url in
@@ -453,6 +454,9 @@ struct ContentView: View {
             Button("Wiki Link  [[\(note.title)]]") { NoteLink.copy(NoteLink.wikiLink(for: note)) }
             if let url = NoteLink.url(for: note) {
                 Button("App Link") { NoteLink.copy("[\(note.title)](\(url.absoluteString))") }
+            }
+            if let url = NoteServer.url(for: note) {
+                Button("URL for Claude Code") { NoteLink.copy(url) }
             }
         }
         Button("Save as Template…") { ask(.saveTemplate(note)) }
@@ -697,6 +701,7 @@ struct NoteActions {
     var saveAsTemplate: (() -> Void)?
     var deleteTemplate: (String) -> Void
     var insertLink: (() -> Void)?
+    var copyServerURL: (() -> Void)?
 }
 
 private struct NoteActionsKey: FocusedValueKey {

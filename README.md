@@ -11,6 +11,7 @@ A small native macOS app for writing Markdown notes, built with SwiftUI and Swif
 - Duplicate a note (⌘D or its context menu)
 - Templates: File ▸ New Note from Template (or hold the New Note toolbar button) with built-in **Bug Report** and **Roadmap** templates. Save any note as your own template from its context menu or File ▸ Save Note as Template…; `{{date}}`, `{{time}}` and `{{datetime}}` are filled in when a note is created from it
 - Note links: write `[[Note Title]]` (or `[[Note Title|shown text]]`) to link to another note, or press ⌘K to pick one. Click a link in the preview to open that note; links to notes that don't exist yet are dimmed, and clicking one creates the note. Copy a note's link from its context menu (Copy Link)
+- Claude Code access: notes are served read-only at `http://127.0.0.1:7337/` (see [Using with Claude Code](#using-with-claude-code))
 - Export a note as a paginated PDF (⇧⌘E, the toolbar or its context menu), rendered from the Markdown preview in a print-friendly light style
 - Edit, Split and Preview modes, with a native Markdown preview (headings, lists, task lists, quotes, code blocks, inline styles, links, Discord-style `-#` subtext)
 - Saves automatically as you type
@@ -61,6 +62,29 @@ swift run
 | ⌘0       | Reset zoom                                |
 | ⌘,       | Settings (theme, text size, transparency) |
 
+## Using with Claude Code
+
+While TextStudio is running it serves your notes, read-only, at `http://127.0.0.1:7337/`. The server only listens on this Mac's loopback interface and rejects requests that don't address `127.0.0.1` or `localhost`. Turn it off or change the port in Settings ▸ Claude Code.
+
+Tell Claude Code something like:
+
+> My notes are in TextStudio at http://127.0.0.1:7337/ — use `curl` to read them.
+
+| URL                         | Returns                                                         |
+| --------------------------- | --------------------------------------------------------------- |
+| `/`                         | This list of URLs                                               |
+| `/notes`                    | Every note: title, URL, folder, tags, last edit (most recent first) |
+| `/notes?tag=dev`, `?folder=Work` | Notes with that tag, or in that folder                     |
+| `/notes.json`               | The same list as JSON                                           |
+| `/notes/<id>`               | One note's Markdown                                             |
+| `/note?title=<title>`       | The note with that title (follows a `[[Title]]` link)           |
+| `/search?q=<text>`          | Notes whose text or tags contain the text                       |
+| `/templates`                | All templates                                                   |
+
+Right-click a note ▸ Copy Link ▸ URL for Claude Code (or Edit ▸ Copy Note URL for Claude Code) to copy the URL of a single note.
+
+`textstudio://note/<id>` links (Copy Link ▸ App Link) open the note in TextStudio from anywhere, such as a browser or `open textstudio://note/<id>` in a terminal.
+
 ## Data
 
 Notes are stored at:
@@ -83,6 +107,7 @@ Sources/TextStudio/
   MarkdownView.swift       Markdown parser and renderer
   Note.swift               SwiftData models
   NoteLinks.swift          [[Wiki links]], textstudio:// links, link picker
+  NoteServer.swift         Read-only local HTTP server for Claude Code
   Templates.swift          Built-in note templates
   Theme.swift              Palettes, fonts, frosted background
 ```

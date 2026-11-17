@@ -61,6 +61,7 @@ struct TextStudioApp: App {
         let saved = UserDefaults.standard.string(forKey: "theme") ?? ""
         (AppTheme(rawValue: saved) ?? .dark).apply()
         ZoomKeyMonitor.install()
+        NoteServer.shared.start(container: container)
     }
 
     /** Gives notes created before note links existed their stable id. */
@@ -164,6 +165,8 @@ struct AppCommands: Commands {
             Button("Insert Link to Note…") { actions?.insertLink?() }
                 .keyboardShortcut("k")
                 .disabled(actions?.insertLink == nil)
+            Button("Copy Note URL for Claude Code") { actions?.copyServerURL?() }
+                .disabled(actions?.copyServerURL == nil)
         }
 
         CommandGroup(after: .sidebar) {
@@ -213,6 +216,17 @@ struct SettingsView: View {
     @AppStorage("theme") private var theme: AppTheme = .dark
     @AppStorage("fontSize") private var fontSize = Prefs.defaultFontSize
     @AppStorage("tintOpacity") private var tintOpacity = 0.55
+    @AppStorage(NoteServer.enabledKey) private var serverEnabled = true
+    @AppStorage(NoteServer.portKey) private var serverPort = NoteServer.defaultPort
+    @ObservedObject private var server = NoteServer.shared
+
+    private var serverStatus: (text: String, color: Color) {
+        switch server.status {
+        case .running(let port): ("Serving notes at http://127.0.0.1:\(port)", .green)
+        case .failed(let error): ("Couldn't start: \(error)", .red)
+        case .stopped: ("Off", .secondary)
+        }
+    }
 
     var body: some View {
         Form {
@@ -234,9 +248,32 @@ struct SettingsView: View {
                 }
             }
 
+            Section {
+                Toggle("Serve notes at a local URL", isOn: $serverEnabled)
+                LabeledContent("Port") {
+                    TextField("Port", value: $serverPort, format: .number.grouping(.never))
+                        .frame(width: 70)
+                        .multilineTextAlignment(.trailing)
+                }
+                .disabled(!serverEnabled)
+                LabeledContent("Status") {
+                    HStack {
+                        Text(serverStatus.text).foregroundStyle(serverStatus.color).textSelection(.enabled)
+                        if case .running = server.status {
+                            Button("Copy") { NoteLink.copy(NoteServer.baseURL + "/") }
+                        }
+                    }
+                }
+            } header: {
+                Text("Claude Code")
+            } footer: {
+                Text("Read-only, and only reachable from this Mac. Tell Claude Code: \"Use curl to read my notes at http://127.0.0.1:\(String(serverPort))/\"")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
-        .frame(width: 420)
+        .frame(width: 460)
         .fixedSize()
     }
 }
