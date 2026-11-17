@@ -525,13 +525,7 @@ struct NoteDetailView: View {
             Rectangle().fill(palette.secondary.opacity(0.25)).frame(height: 1)
             HStack(spacing: 0) {
                 if mode != .preview {
-                    TextEditor(text: $note.body)
-                        .font(Fonts.mono(fontSize))
-                        .foregroundStyle(palette.text)
-                        .lineSpacing(fontSize * 0.25)
-                        .scrollContentBackground(.hidden)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
+                    MarkdownEditor(text: $note.body, fontSize: fontSize, palette: palette)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
 

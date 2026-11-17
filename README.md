@@ -76,6 +76,7 @@ build-app.sh
 Sources/TextStudio/
   TextStudioApp.swift      App entry, menu commands, settings
   ContentView.swift        Sidebar, editor and preview layout
+  MarkdownEditor.swift     Editor with Markdown syntax highlighting
   MarkdownView.swift       Markdown parser and renderer
   Note.swift               SwiftData model
   Theme.swift              Palettes, fonts, frosted background

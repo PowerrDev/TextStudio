@@ -220,6 +220,13 @@ enum Fonts {
     static let monoFamily = "PlemolJP Console NF"
     static let monoAvailable = NSFont(name: "PlemolJPConsoleNF-Regular", size: 12) != nil
 
+    static func nsMono(_ size: Double, weight: NSFont.Weight = .regular) -> NSFont {
+        if monoAvailable, let f = NSFont(name: weight == .regular ? "PlemolJPConsoleNF-Regular" : "PlemolJPConsoleNF-Bold", size: size) {
+            return f
+        }
+        return .monospacedSystemFont(ofSize: size, weight: weight)
+    }
+
     static func mono(_ size: Double, weight: Font.Weight = .regular) -> Font {
         monoAvailable
             ? .custom(monoFamily, size: size).weight(weight)
