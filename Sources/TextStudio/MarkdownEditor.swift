@@ -115,6 +115,7 @@ enum MarkdownHighlighter {
     private static let heading = re(#"^(#{1,6})[ \t].*$"#)
     private static let listMarker = re(#"^[ \t]*(?:[-*+]|\d+[.)])(?=[ \t])"#)
     private static let task = re(#"^[ \t]*[-*+][ \t]+(\[[ xX]\])"#)
+    private static let subtext = re(#"^[ \t]*-#[ \t].*$"#)
     private static let quote = re(#"^[ \t]*>.*$"#)
     private static let rule = re(#"^[ \t]*([-*_])(?:[ \t]*\1){2,}[ \t]*$"#)
     private static let bold = re(#"(\*\*|__)(?=\S)[^\n]*?\S\1"#)
@@ -143,6 +144,10 @@ enum MarkdownHighlighter {
             color(m.range(at: 1), done ? p.check : p.secondary)
         }
         each(quote) { m in color(m.range, p.secondary) }
+        each(subtext) { m in
+            color(m.range, p.secondary)
+            s.addAttribute(.font, value: Fonts.nsMono(size * 0.85), range: m.range)
+        }
         each(rule) { m in color(m.range, p.secondary) }
 
         each(italic) { m in color(m.range, p.italic) }

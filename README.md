@@ -10,7 +10,7 @@ A small native macOS app for writing Markdown notes, built with SwiftUI and Swif
 - Hide the note list (⌥⌘L or the toolbar button) for a two-column layout; clicking a folder or tag then opens its most recent note
 - Duplicate a note (⌘D or its context menu)
 - Export a note as a paginated PDF (⇧⌘E, the toolbar or its context menu), rendered from the Markdown preview in a print-friendly light style
-- Edit, Split and Preview modes, with a native Markdown preview (headings, lists, task lists, quotes, code blocks, inline styles, links)
+- Edit, Split and Preview modes, with a native Markdown preview (headings, lists, task lists, quotes, code blocks, inline styles, links, Discord-style `-#` subtext)
 - Saves automatically as you type
 - Zoom with ⌘+ / ⌘− / ⌘0 or a trackpad pinch
 - Frosted, translucent background across all three columns, with adjustable transparency

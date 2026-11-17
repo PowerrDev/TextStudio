@@ -72,6 +72,8 @@ struct MarkdownView: View {
         case numbered(String, String, indent: Int)
         case task(Bool, String, indent: Int)
         case quote(String)
+        /** Discord-style `-# text`: small, dimmed. */
+        case subtext(String)
         case code(String)
         case rule
     }
@@ -123,6 +125,12 @@ struct MarkdownView: View {
                 RoundedRectangle(cornerRadius: 1.5).fill(palette.quoteBar).frame(width: 3)
                 inline(s).italic().foregroundStyle(palette.secondary).fixedSize(horizontal: false, vertical: true)
             }
+
+        case .subtext(let s):
+            inline(s)
+                .font(.system(size: fontSize * 0.8))
+                .foregroundStyle(palette.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
         case .code(let s):
             Group {
@@ -226,6 +234,13 @@ struct MarkdownView: View {
                     blocks.append(.heading(level, rest.trimmingCharacters(in: .whitespaces)))
                     continue
                 }
+            }
+
+            /* Subtext (Discord-style "-# text") */
+            if trimmed.hasPrefix("-# ") {
+                flush()
+                blocks.append(.subtext(trimmed.dropFirst(3).trimmingCharacters(in: .whitespaces)))
+                continue
             }
 
             /* Horizontal rule */
