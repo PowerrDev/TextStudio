@@ -98,6 +98,19 @@ final class Note {
 }
 
 @Model
+final class NoteTemplate {
+    var name: String
+    var body: String
+    var createdAt: Date
+
+    init(name: String, body: String) {
+        self.name = name
+        self.body = body
+        self.createdAt = .now
+    }
+}
+
+@Model
 final class Folder {
     var name: String
     var createdAt: Date

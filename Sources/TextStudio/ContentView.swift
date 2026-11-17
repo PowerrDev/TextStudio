@@ -51,18 +51,23 @@ enum NamePrompt {
     case newFolder
     case renameFolder(Folder)
     case renameTag(String)
+    case saveTemplate(Note)
 
     var title: String {
         switch self {
         case .newFolder: "New Folder"
         case .renameFolder: "Rename Folder"
         case .renameTag: "Rename Tag"
+        case .saveTemplate: "Save as Template"
         }
     }
 
     var confirm: String {
-        if case .newFolder = self { return "Create" }
-        return "Rename"
+        switch self {
+        case .newFolder: "Create"
+        case .saveTemplate: "Save"
+        default: "Rename"
+        }
     }
 
     var initial: String {
@@ -70,6 +75,7 @@ enum NamePrompt {
         case .newFolder: ""
         case .renameFolder(let f): f.name
         case .renameTag(let t): t
+        case .saveTemplate(let n): n.title
         }
     }
 }
@@ -80,6 +86,7 @@ struct ContentView: View {
     @Query(sort: \Note.updatedAt, order: .reverse) private var notes: [Note]
     @Query(sort: \Folder.name) private var folders: [Folder]
     @Query private var tagColors: [TagColor]
+    @Query(sort: \NoteTemplate.name) private var userTemplates: [NoteTemplate]
 
     @State private var customColor: CustomColorTarget?
     @State private var sidebar: SidebarItem? = .all
@@ -119,6 +126,10 @@ struct ContentView: View {
 
     private func pickCustomColor(_ tag: String) {
         customColor = CustomColorTarget(tag: tag, initial: tagColor(tag))
+    }
+
+    private var templates: [TemplateItem] {
+        TemplateItem.builtIns + userTemplates.map(TemplateItem.init)
     }
 
     private var scoped: [Note] {
@@ -223,7 +234,11 @@ struct ContentView: View {
             toggleNoteList: { withAnimation { showNoteList.toggle() } },
             noteListVisible: showNoteList,
             duplicate: selection.map { note in { duplicate(note) } },
-            exportPDF: selection.map { note in { PDFExporter.export(note) } }
+            exportPDF: selection.map { note in { PDFExporter.export(note) } },
+            templates: templates,
+            newFromTemplate: { addNote(body: $0.expanded()) },
+            saveAsTemplate: selection.map { note in { ask(.saveTemplate(note)) } },
+            deleteTemplate: deleteTemplate
         ))
         .alert(prompt?.title ?? "", isPresented: Binding(
             get: { prompt != nil },
@@ -359,7 +374,16 @@ struct ContentView: View {
         .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 400)
         .toolbar {
             ToolbarItem {
-                Button(action: addNote) { Label("New Note", systemImage: "square.and.pencil") }
+                Menu {
+                    ForEach(templates) { t in
+                        Button(t.name) { addNote(body: t.expanded()) }
+                    }
+                } label: {
+                    Label("New Note", systemImage: "square.and.pencil")
+                } primaryAction: {
+                    addNote()
+                }
+                .help("New Note (⌘N) — hold for templates")
             }
         }
         .onDeleteCommand {
@@ -407,6 +431,7 @@ struct ContentView: View {
             }
         }
 
+        Button("Save as Template…") { ask(.saveTemplate(note)) }
         Button("Export as PDF…") { PDFExporter.export(note) }
         Divider()
         Button("Delete", role: .destructive) { delete(note) }
@@ -414,7 +439,9 @@ struct ContentView: View {
 
     // MARK: - Notes
 
-    private func addNote() {
+    private func addNote() { addNote(body: "# New note\n\n") }
+
+    private func addNote(body: String) {
         var tags: [String] = []
         var folder: Folder?
 
@@ -424,7 +451,7 @@ struct ContentView: View {
         case .tag(let t): tags = [t]
         }
 
-        let note = Note(body: "# New note\n\n", tags: tags, folder: folder)
+        let note = Note(body: body, tags: tags, folder: folder)
         context.insert(note)
         save()
         search = ""
@@ -484,6 +511,14 @@ struct ContentView: View {
 
             TagColor.rename(old, to: new, in: context)
             if sidebar == .tag(old) { sidebar = .tag(new) }
+
+        case .saveTemplate(let note):
+            guard !name.isEmpty else { return }
+            if let existing = userTemplates.first(where: { $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }) {
+                existing.body = note.body
+            } else {
+                context.insert(NoteTemplate(name: name, body: note.body))
+            }
         }
 
         save()
@@ -499,6 +534,12 @@ struct ContentView: View {
         for note in notes where note.tags.contains(tag) { note.tags.removeAll { $0 == tag } }
         TagColor.set(tag, hex: nil, in: context)
         if sidebar == .tag(tag) { sidebar = .all }
+        save()
+    }
+
+    private func deleteTemplate(_ id: String) {
+        guard let t = userTemplates.first(where: { TemplateItem($0).id == id }) else { return }
+        context.delete(t)
         save()
     }
 
@@ -574,6 +615,10 @@ struct NoteActions {
     var noteListVisible: Bool
     var duplicate: (() -> Void)?
     var exportPDF: (() -> Void)?
+    var templates: [TemplateItem]
+    var newFromTemplate: (TemplateItem) -> Void
+    var saveAsTemplate: (() -> Void)?
+    var deleteTemplate: (String) -> Void
 }
 
 private struct NoteActionsKey: FocusedValueKey {

@@ -43,7 +43,7 @@ struct TextStudioApp: App {
         let config = ModelConfiguration(url: dir.appending(path: "Notes.store"))
 
         do {
-            container = try ModelContainer(for: Note.self, Folder.self, TagColor.self, configurations: config)
+            container = try ModelContainer(for: Note.self, Folder.self, TagColor.self, NoteTemplate.self, configurations: config)
         } catch {
             fatalError("Could not open notes database: \(error)")
         }
@@ -104,14 +104,39 @@ struct AppCommands: Commands {
 
     @FocusedValue(\.noteActions) private var actions
 
+    @ViewBuilder
+    private func templateButtons(builtIn: Bool) -> some View {
+        ForEach(actions?.templates.filter { $0.builtIn == builtIn } ?? []) { t in
+            Button(t.name) { actions?.newFromTemplate(t) }
+        }
+    }
+
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
             Button("New Note") { actions?.newNote() }
                 .keyboardShortcut("n")
                 .disabled(actions == nil)
+            Menu("New Note from Template") {
+                templateButtons(builtIn: true)
+                if actions?.templates.contains(where: { !$0.builtIn }) == true {
+                    Divider()
+                    templateButtons(builtIn: false)
+                }
+            }
+            .disabled(actions == nil)
             Button("New Folder") { actions?.newFolder() }
                 .keyboardShortcut("n", modifiers: [.command, .shift])
                 .disabled(actions == nil)
+            Divider()
+            Button("Save Note as Template…") { actions?.saveAsTemplate?() }
+                .disabled(actions?.saveAsTemplate == nil)
+            Menu("Delete Template") {
+                ForEach(actions?.templates.filter { !$0.builtIn } ?? []) { t in
+                    Button(t.name) { actions?.deleteTemplate(t.id) }
+                }
+            }
+            .disabled(actions?.templates.contains(where: { !$0.builtIn }) != true)
+            Divider()
             Button("Duplicate Note") { actions?.duplicate?() }
                 .keyboardShortcut("d")
                 .disabled(actions?.duplicate == nil)
@@ -188,6 +213,7 @@ struct SettingsView: View {
                     Text("Solid").font(.caption).foregroundStyle(.secondary)
                 }
             }
+
         }
         .formStyle(.grouped)
         .frame(width: 420)

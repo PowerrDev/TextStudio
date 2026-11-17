@@ -9,6 +9,7 @@ A small native macOS app for writing Markdown notes, built with SwiftUI and Swif
 - Tags: add them in the tag bar above the editor (Return or comma to add, or pick an existing tag from the menu), then browse by tag in the sidebar. Right-click a tag (in the sidebar or the tag bar) to give it a color: Red, Orange, Yellow, Green, Teal, Blue, Purple, Pink, Gray, or any custom color. Rename or remove a tag across all notes from its context menu. Search also matches tags (`#tag`)
 - Hide the note list (⌥⌘L or the toolbar button) for a two-column layout; clicking a folder or tag then opens its most recent note
 - Duplicate a note (⌘D or its context menu)
+- Templates: File ▸ New Note from Template (or hold the New Note toolbar button) with built-in **Bug Report** and **Roadmap** templates. Save any note as your own template from its context menu or File ▸ Save Note as Template…; `{{date}}`, `{{time}}` and `{{datetime}}` are filled in when a note is created from it
 - Export a note as a paginated PDF (⇧⌘E, the toolbar or its context menu), rendered from the Markdown preview in a print-friendly light style
 - Edit, Split and Preview modes, with a native Markdown preview (headings, lists, task lists, quotes, code blocks, inline styles, links, Discord-style `-#` subtext)
 - Saves automatically as you type
@@ -78,7 +79,8 @@ Sources/TextStudio/
   ContentView.swift        Sidebar, editor and preview layout
   MarkdownEditor.swift     Editor with Markdown syntax highlighting
   MarkdownView.swift       Markdown parser and renderer
-  Note.swift               SwiftData model
+  Note.swift               SwiftData models
+  Templates.swift          Built-in note templates
   Theme.swift              Palettes, fonts, frosted background
 ```
 
