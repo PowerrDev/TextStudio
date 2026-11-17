@@ -30,22 +30,24 @@ import AppKit
 // MARK: - Appearance setting
 
 enum AppTheme: String, CaseIterable, Identifiable {
-    case system, light, dark, catppuccin, tokyoNight
+    case system, light, dark, catppuccin, catppuccinLatte, tokyoNight, tokyoNightDay
     var id: String { rawValue }
     var label: String {
         switch self {
         case .system: "System"
         case .light: "Light"
         case .dark: "Dark"
-        case .catppuccin: "Catppuccin"
+        case .catppuccin: "Catppuccin Mocha"
+        case .catppuccinLatte: "Catppuccin Latte"
         case .tokyoNight: "Tokyo Night"
+        case .tokyoNightDay: "Tokyo Night Day"
         }
     }
 
     var nsAppearance: NSAppearance? {
         switch self {
         case .system: nil
-        case .light: NSAppearance(named: .aqua)
+        case .light, .catppuccinLatte, .tokyoNightDay: NSAppearance(named: .aqua)
         case .dark, .catppuccin, .tokyoNight: NSAppearance(named: .darkAqua)
         }
     }
@@ -55,7 +57,9 @@ enum AppTheme: String, CaseIterable, Identifiable {
         switch self {
         case .system, .light, .dark: Palette.forScheme(scheme)
         case .catppuccin: .catppuccin
+        case .catppuccinLatte: .catppuccinLatte
         case .tokyoNight: .tokyoNight
+        case .tokyoNightDay: .tokyoNightDay
         }
     }
 
@@ -69,7 +73,7 @@ enum Prefs {
     static func clamp(_ v: Double) -> Double { min(max(v, minFontSize), maxFontSize) }
 }
 
-// MARK: - Palettes (dark = Solarized Dark Vivid, matching Ghostty; plus Catppuccin Mocha and Tokyo Night)
+// MARK: - Palettes (dark = Solarized Dark Vivid, matching Ghostty; plus Catppuccin and Tokyo Night in dark and light)
 
 struct Palette {
     let background: Color
@@ -149,6 +153,38 @@ struct Palette {
         italic: Color(hex: 0xFF9E64),
         quoteBar: Color(hex: 0x3B4261),
         check: Color(hex: 0x9ECE6A)
+    )
+
+    /** Catppuccin Latte. */
+    static let catppuccinLatte = Palette(
+        background: Color(hex: 0xEFF1F5),        /* base */
+        text: Color(hex: 0x4C4F69),              /* text */
+        secondary: Color(hex: 0x7C7F93),         /* overlay2 */
+        headings: [Color(hex: 0xD20F39), Color(hex: 0x1E66F5), Color(hex: 0x179299), Color(hex: 0xDF8E1D)],
+        accent: Color(hex: 0x8839EF),            /* mauve */
+        link: Color(hex: 0x1E66F5),              /* blue */
+        code: Color(hex: 0x40A02B),              /* green */
+        codeBackground: Color(hex: 0xE6E9EF),    /* mantle */
+        bold: Color(hex: 0xDD7878),              /* flamingo */
+        italic: Color(hex: 0xFE640B),            /* peach */
+        quoteBar: Color(hex: 0xACB0BE),          /* surface2 */
+        check: Color(hex: 0x40A02B)              /* green */
+    )
+
+    /** Tokyo Night Day. */
+    static let tokyoNightDay = Palette(
+        background: Color(hex: 0xE1E2E7),
+        text: Color(hex: 0x3760BF),
+        secondary: Color(hex: 0x848CB5),
+        headings: [Color(hex: 0xF52A65), Color(hex: 0x2E7DE9), Color(hex: 0x007197), Color(hex: 0x8C6C3E)],
+        accent: Color(hex: 0x2E7DE9),
+        link: Color(hex: 0x2E7DE9),
+        code: Color(hex: 0x587539),
+        codeBackground: Color(hex: 0xD0D5E3),
+        bold: Color(hex: 0x9854F1),
+        italic: Color(hex: 0xB15C00),
+        quoteBar: Color(hex: 0xA8AECB),
+        check: Color(hex: 0x587539)
     )
 
     /** Light palette on white paper, with darker body text for print. */
