@@ -62,17 +62,25 @@ struct MarkdownEditor: NSViewRepresentable {
         context.coordinator.parent = self
         guard let tv = scroll.documentView as? NSTextView else { return }
 
+        let c = context.coordinator
+        var needsHighlight = c.styledFontSize != fontSize || c.styledPalette != palette
+
+        /* Typing already updated the view; only replace text changed elsewhere. */
         if tv.string != text {
             let selection = tv.selectedRanges
             tv.string = text
             tv.selectedRanges = selection.filter { NSMaxRange($0.rangeValue) <= (text as NSString).length }
+            needsHighlight = true
         }
 
-        context.coordinator.highlight(tv)
+        if needsHighlight { c.highlight(tv) }
     }
 
     final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: MarkdownEditor
+        /** Font size and palette of the last highlight pass, to skip redundant ones. */
+        var styledFontSize: Double?
+        var styledPalette: Palette?
 
         init(_ parent: MarkdownEditor) { self.parent = parent }
 
@@ -88,6 +96,8 @@ struct MarkdownEditor: NSViewRepresentable {
 
             let size = parent.fontSize
             let p = parent.palette
+            styledFontSize = size
+            styledPalette = p
             let base = Fonts.nsMono(size)
             let para = NSMutableParagraphStyle()
             para.lineSpacing = size * 0.25

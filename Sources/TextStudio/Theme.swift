@@ -75,7 +75,7 @@ enum Prefs {
 
 // MARK: - Palettes (dark = Solarized Dark Vivid, matching Ghostty; plus Catppuccin and Tokyo Night in dark and light)
 
-struct Palette {
+struct Palette: Equatable {
     let background: Color
     let text: Color
     let secondary: Color

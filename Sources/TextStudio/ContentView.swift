@@ -639,6 +639,22 @@ struct NoteDetailView: View {
     @AppStorage("theme") private var theme: AppTheme = .dark
 
     @State private var pinchStart: Double?
+    @State private var pendingSave: Task<Void, Never>?
+    /**
+     * What the editor shows. Typing goes here, not into `note.body`: the note list,
+     * sidebar and link index all read every note's body, so writing it per keystroke
+     * re-lays out the whole window and makes typing lag. Copied into the note on pause.
+     */
+    @State private var draft: String
+
+    init(note: Note, mode: EditorMode, allTags: [String], tagHexes: [String: Int], linkTargets: Set<String>) {
+        self.note = note
+        self.mode = mode
+        self.allTags = allTags
+        self.tagHexes = tagHexes
+        self.linkTargets = linkTargets
+        _draft = State(initialValue: note.body)
+    }
 
     var body: some View {
         let palette = theme.palette(scheme)
@@ -647,7 +663,7 @@ struct NoteDetailView: View {
             Rectangle().fill(palette.secondary.opacity(0.25)).frame(height: 1)
             HStack(spacing: 0) {
                 if mode != .preview {
-                    MarkdownEditor(text: $note.body, fontSize: fontSize, palette: palette)
+                    MarkdownEditor(text: $draft, fontSize: fontSize, palette: palette)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
 
@@ -657,7 +673,7 @@ struct NoteDetailView: View {
 
                 if mode != .edit {
                     ScrollView {
-                        MarkdownView(text: note.body, fontSize: fontSize, palette: palette, linkTargets: linkTargets)
+                        MarkdownView(text: draft, fontSize: fontSize, palette: palette, linkTargets: linkTargets)
                             .padding(20)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -679,10 +695,38 @@ struct NoteDetailView: View {
                 .onEnded { _ in pinchStart = nil }
         )
         .navigationTitle(note.title)
-        .onChange(of: note.body) {
-            note.updatedAt = .now
-            try? context.save()
+        .onChange(of: draft) {
+            pendingSave?.cancel()
+            pendingSave = Task {
+                try? await Task.sleep(for: .milliseconds(800))
+                guard !Task.isCancelled else { return }
+                commit()
+            }
         }
+        /* The body changed somewhere other than this editor; show it. */
+        .onChange(of: note.body) {
+            if pendingSave == nil, note.body != draft { draft = note.body }
+        }
+        .onDisappear {
+            if pendingSave != nil { commit() }
+        }
+        /* Don't lose the last keystrokes when quitting or switching apps mid-pause. */
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willTerminateNotification)) { _ in
+            if pendingSave != nil { commit() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.willResignActiveNotification)) { _ in
+            if pendingSave != nil { commit() }
+        }
+    }
+
+    /** Copies the draft into the note and saves it; called once typing pauses. */
+    private func commit() {
+        pendingSave?.cancel()
+        pendingSave = nil
+        guard note.body != draft else { return }
+        note.body = draft
+        note.updatedAt = .now
+        try? context.save()
     }
 }
 
