@@ -1,5 +1,7 @@
 # 📝 TextStudio - Markdown Notes
 
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/370137f2-42df-404e-b2bf-c26896fe8f5e" />
+
 A small native macOS app for writing Markdown notes, built with SwiftUI and SwiftData. Notes are stored in a local SQLite database.
 
 ## Features
