@@ -48,6 +48,8 @@ struct TextStudioApp: App {
             fatalError("Could not open notes database: \(error)")
         }
 
+        Self.backfillNoteIDs(container.mainContext)
+
         var recent = FetchDescriptor<Note>(sortBy: [SortDescriptor(\.updatedAt, order: .reverse)])
         recent.fetchLimit = 1
         initialNote = try? container.mainContext.fetch(recent).first
@@ -59,6 +61,15 @@ struct TextStudioApp: App {
         let saved = UserDefaults.standard.string(forKey: "theme") ?? ""
         (AppTheme(rawValue: saved) ?? .dark).apply()
         ZoomKeyMonitor.install()
+    }
+
+    /** Gives notes created before note links existed their stable id. */
+    private static func backfillNoteIDs(_ context: ModelContext) {
+        let missing = (try? context.fetch(FetchDescriptor<Note>(predicate: #Predicate { $0.uid == nil }))) ?? []
+        guard !missing.isEmpty else { return }
+
+        missing.forEach { $0.uid = UUID() }
+        try? context.save()
     }
 
     /** One-time move of data and settings from the app's old name ("MarkdownNotes"). */
@@ -87,6 +98,8 @@ struct TextStudioApp: App {
             ContentView(initialSelection: initialNote)
                 .frame(minWidth: 900, minHeight: 500)
                 .onChange(of: theme) { theme.apply() }
+                /* textstudio:// links open in the existing window instead of a new one. */
+                .handlesExternalEvents(preferring: ["*"], allowing: ["*"])
         }
         .defaultSize(width: 1200, height: 750)
         .modelContainer(container)
@@ -144,6 +157,13 @@ struct AppCommands: Commands {
             Button("Export as PDF…") { actions?.exportPDF?() }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
                 .disabled(actions?.exportPDF == nil)
+        }
+
+        CommandGroup(after: .pasteboard) {
+            Divider()
+            Button("Insert Link to Note…") { actions?.insertLink?() }
+                .keyboardShortcut("k")
+                .disabled(actions?.insertLink == nil)
         }
 
         CommandGroup(after: .sidebar) {

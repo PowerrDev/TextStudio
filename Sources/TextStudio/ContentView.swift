@@ -94,6 +94,7 @@ struct ContentView: View {
     @State private var search = ""
     @State private var prompt: NamePrompt?
     @State private var promptText = ""
+    @State private var linkTarget: LinkInsertTarget?
 
     @AppStorage("editorMode") private var mode: EditorMode = .split
     @AppStorage("showNoteList") private var showNoteList = true
@@ -130,6 +131,11 @@ struct ContentView: View {
 
     private var templates: [TemplateItem] {
         TemplateItem.builtIns + userTemplates.map(TemplateItem.init)
+    }
+
+    /** Titles of every note, for telling working `[[links]]` from broken ones. */
+    private var linkTargets: Set<String> {
+        Set(notes.map { NoteLink.key($0.title) })
     }
 
     private var scoped: [Note] {
@@ -181,7 +187,8 @@ struct ContentView: View {
     @ViewBuilder
     private var detail: some View {
         if let note = selection {
-            NoteDetailView(note: note, mode: mode, allTags: tagCounts.map(\.tag), tagHexes: tagHexes)
+            NoteDetailView(note: note, mode: mode, allTags: tagCounts.map(\.tag), tagHexes: tagHexes,
+                           linkTargets: linkTargets)
                 .id(note.persistentModelID)
         } else {
             ContentUnavailableView("No Note Selected", systemImage: "note.text",
@@ -238,8 +245,19 @@ struct ContentView: View {
             templates: templates,
             newFromTemplate: { addNote(body: $0.expanded()) },
             saveAsTemplate: selection.map { note in { ask(.saveTemplate(note)) } },
-            deleteTemplate: deleteTemplate
+            deleteTemplate: deleteTemplate,
+            insertLink: selection.map { note in { beginInsertLink(into: note) } }
         ))
+        /* Clicking a note link in the preview opens that note. */
+        .environment(\.openURL, OpenURLAction { url in
+            follow(url) ? .handled : .systemAction
+        })
+        .onOpenURL { _ = follow($0) }
+        .sheet(item: $linkTarget) { target in
+            NoteLinkPicker(notes: notes, exclude: target.note) { picked in
+                insertLink(to: picked, at: target)
+            }
+        }
         .alert(prompt?.title ?? "", isPresented: Binding(
             get: { prompt != nil },
             set: { if !$0 { prompt = nil } }
@@ -431,6 +449,12 @@ struct ContentView: View {
             }
         }
 
+        Menu("Copy Link") {
+            Button("Wiki Link  [[\(note.title)]]") { NoteLink.copy(NoteLink.wikiLink(for: note)) }
+            if let url = NoteLink.url(for: note) {
+                Button("App Link") { NoteLink.copy("[\(note.title)](\(url.absoluteString))") }
+            }
+        }
         Button("Save as Template…") { ask(.saveTemplate(note)) }
         Button("Export as PDF…") { PDFExporter.export(note) }
         Divider()
@@ -469,6 +493,58 @@ struct ContentView: View {
         if selection == note { selection = nil }
         context.delete(note)
         save()
+    }
+
+    /** Selects a note, widening the list if the current folder, tag or search hides it. */
+    private func reveal(_ note: Note) {
+        if !filtered.contains(note) {
+            search = ""
+            if !scoped.contains(note) { sidebar = .all }
+        }
+        selection = note
+    }
+
+    /**
+     * Opens a `textstudio://` link. A `[[Title]]` link to a note that doesn't
+     * exist yet creates it, in the current folder.
+     */
+    private func follow(_ url: URL) -> Bool {
+        guard let target = NoteLink.target(of: url) else { return false }
+
+        switch target {
+        case .id(let id):
+            if let note = NoteLink.resolve(id, in: notes) { reveal(note) } else { NSSound.beep() }
+        case .title(let title):
+            if let note = NoteLink.resolve(title, in: notes) {
+                reveal(note)
+            } else {
+                let note = Note(body: "# \(title)\n\n", folder: selection?.folder)
+                context.insert(note)
+                save()
+                reveal(note)
+            }
+        }
+
+        return true
+    }
+
+    private func beginInsertLink(into note: Note) {
+        let editor = NoteLink.focusedEditor()
+        linkTarget = LinkInsertTarget(note: note, editor: editor,
+                                      range: editor?.selectedRange() ?? NSRange(location: NSNotFound, length: 0))
+    }
+
+    private func insertLink(to picked: Note, at target: LinkInsertTarget) {
+        let link = NoteLink.wikiLink(for: picked)
+
+        if let editor = target.editor, editor.window != nil, target.range.location != NSNotFound {
+            editor.window?.makeFirstResponder(editor)
+            NoteLink.insert(link, into: editor, at: target.range)
+        } else {
+            let body = target.note.body
+            target.note.body = body + (body.hasSuffix("\n") || body.isEmpty ? "" : "\n") + link + "\n"
+            save()
+        }
     }
 
     private func move(_ refs: [NoteRef], to folder: Folder?) -> Bool {
@@ -551,6 +627,7 @@ struct NoteDetailView: View {
     let mode: EditorMode
     let allTags: [String]
     let tagHexes: [String: Int]
+    let linkTargets: Set<String>
     @Environment(\.modelContext) private var context
     @Environment(\.colorScheme) private var scheme
 
@@ -576,7 +653,7 @@ struct NoteDetailView: View {
 
                 if mode != .edit {
                     ScrollView {
-                        MarkdownView(text: note.body, fontSize: fontSize, palette: palette)
+                        MarkdownView(text: note.body, fontSize: fontSize, palette: palette, linkTargets: linkTargets)
                             .padding(20)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -619,6 +696,7 @@ struct NoteActions {
     var newFromTemplate: (TemplateItem) -> Void
     var saveAsTemplate: (() -> Void)?
     var deleteTemplate: (String) -> Void
+    var insertLink: (() -> Void)?
 }
 
 private struct NoteActionsKey: FocusedValueKey {

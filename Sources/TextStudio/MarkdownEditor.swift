@@ -122,6 +122,7 @@ enum MarkdownHighlighter {
     private static let italic = re(#"(?<![*\w])\*(?![*\s])[^*\n]*?(?<!\s)\*(?!\*)|(?<![_\w])_(?![_\s])[^_\n]*?(?<!\s)_(?![_\w])"#)
     private static let strike = re(#"~~(?=\S)[^\n]*?\S~~"#)
     private static let link = re(#"(!?\[[^\]\n]*\])(\([^)\n]*\))"#)
+    private static let wikiLink = re(#"\[\[[^\[\]\n]+\]\]"#)
     private static let autolink = re(#"<https?://[^>\s]+>"#)
     private static let inlineCode = re(#"`[^`\n]+`"#)
     private static let fence = re(#"^[ \t]*(```|~~~).*?(?:^[ \t]*\1[ \t]*$|\z)"#, [.anchorsMatchLines, .dotMatchesLineSeparators])
@@ -163,6 +164,7 @@ enum MarkdownHighlighter {
             color(m.range(at: 1), p.link)
             color(m.range(at: 2), p.secondary)
         }
+        each(wikiLink) { m in color(m.range, p.link) }
         each(autolink) { m in color(m.range, p.link) }
 
         each(heading) { m in

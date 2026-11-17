@@ -37,9 +37,13 @@ struct MarkdownView: View {
     var palette: Palette = .dark
     /** Lays out for static rendering (PDF): code blocks wrap instead of scrolling. */
     var printable = false
+    /** Lowercased titles of existing notes; `[[links]]` to others are dimmed. Nil: don't check. */
+    var linkTargets: Set<String>? = nil
 
-    init(text: String, fontSize: Double = Prefs.defaultFontSize, palette: Palette = .dark) {
+    init(text: String, fontSize: Double = Prefs.defaultFontSize, palette: Palette = .dark,
+         linkTargets: Set<String>? = nil) {
         self.init(blocks: Self.parse(text), fontSize: fontSize, palette: palette)
+        self.linkTargets = linkTargets
     }
 
     init(blocks: [Block], fontSize: Double = Prefs.defaultFontSize, palette: Palette = .dark, printable: Bool = false) {
@@ -159,7 +163,7 @@ struct MarkdownView: View {
     private func inline(_ s: String) -> Text {
         let opts = AttributedString.MarkdownParsingOptions(interpretedSyntax: .inlineOnlyPreservingWhitespace)
 
-        guard var attr = try? AttributedString(markdown: s, options: opts) else { return Text(s) }
+        guard var attr = try? AttributedString(markdown: NoteLink.expandWikiLinks(s), options: opts) else { return Text(s) }
 
         let runs = attr.runs.map { ($0.range, $0.inlinePresentationIntent, $0.link) }
 
@@ -176,9 +180,15 @@ struct MarkdownView: View {
                 }
             }
 
-            if link != nil {
+            if let link {
                 attr[range].foregroundColor = palette.link
                 attr[range].underlineStyle = .single
+
+                /* A [[link]] to a note that doesn't exist yet (clicking creates it). */
+                if case .title(let t) = NoteLink.target(of: link), let linkTargets, !linkTargets.contains(NoteLink.key(t)) {
+                    attr[range].foregroundColor = palette.secondary
+                    attr[range].underlineStyle = Text.LineStyle(pattern: .dash)
+                }
             }
         }
 

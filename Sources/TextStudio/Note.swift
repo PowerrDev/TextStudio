@@ -36,8 +36,14 @@ final class Note {
     var updatedAt: Date
     var tags: [String] = []
     var folder: Folder?
+    /**
+     * Stable id used in note links and the local URL server. Optional so that
+     * existing stores migrate; notes created before it are backfilled at launch.
+     */
+    var uid: UUID?
 
     init(body: String = "", tags: [String] = [], folder: Folder? = nil) {
+        self.uid = UUID()
         self.body = body
         self.createdAt = .now
         self.updatedAt = .now

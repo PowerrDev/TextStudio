@@ -10,6 +10,7 @@ A small native macOS app for writing Markdown notes, built with SwiftUI and Swif
 - Hide the note list (⌥⌘L or the toolbar button) for a two-column layout; clicking a folder or tag then opens its most recent note
 - Duplicate a note (⌘D or its context menu)
 - Templates: File ▸ New Note from Template (or hold the New Note toolbar button) with built-in **Bug Report** and **Roadmap** templates. Save any note as your own template from its context menu or File ▸ Save Note as Template…; `{{date}}`, `{{time}}` and `{{datetime}}` are filled in when a note is created from it
+- Note links: write `[[Note Title]]` (or `[[Note Title|shown text]]`) to link to another note, or press ⌘K to pick one. Click a link in the preview to open that note; links to notes that don't exist yet are dimmed, and clicking one creates the note. Copy a note's link from its context menu (Copy Link)
 - Export a note as a paginated PDF (⇧⌘E, the toolbar or its context menu), rendered from the Markdown preview in a print-friendly light style
 - Edit, Split and Preview modes, with a native Markdown preview (headings, lists, task lists, quotes, code blocks, inline styles, links, Discord-style `-#` subtext)
 - Saves automatically as you type
@@ -51,6 +52,7 @@ swift run
 | ⌘N       | New note                                  |
 | ⇧⌘N      | New folder                                |
 | ⌘D       | Duplicate the selected note               |
+| ⌘K       | Insert a link to another note             |
 | ⇧⌘E      | Export the selected note as PDF           |
 | ⌥⌘L      | Show/hide the note list                   |
 | ⌫        | Delete the selected note (in the sidebar) |
@@ -80,6 +82,7 @@ Sources/TextStudio/
   MarkdownEditor.swift     Editor with Markdown syntax highlighting
   MarkdownView.swift       Markdown parser and renderer
   Note.swift               SwiftData models
+  NoteLinks.swift          [[Wiki links]], textstudio:// links, link picker
   Templates.swift          Built-in note templates
   Theme.swift              Palettes, fonts, frosted background
 ```
