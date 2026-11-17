@@ -90,6 +90,7 @@ struct ContentView: View {
 
     @AppStorage("editorMode") private var mode: EditorMode = .split
     @AppStorage("showNoteList") private var showNoteList = true
+    @AppStorage("theme") private var theme: AppTheme = .dark
 
     @Environment(\.colorScheme) private var scheme
 
@@ -113,7 +114,7 @@ struct ContentView: View {
     }
 
     private func tagColor(_ tag: String) -> Color {
-        tagHexes[tag].map { Color(hex: UInt32($0)) } ?? Palette.forScheme(scheme).accent
+        tagHexes[tag].map { Color(hex: UInt32($0)) } ?? theme.palette(scheme).accent
     }
 
     private func pickCustomColor(_ tag: String) {
@@ -215,7 +216,7 @@ struct ContentView: View {
                 .disabled(selection == nil)
             }
         }
-        .tint(Palette.forScheme(scheme).accent)
+        .tint(theme.palette(scheme).accent)
         .focusedSceneValue(\.noteActions, NoteActions(
             newNote: addNote,
             newFolder: { ask(.newFolder) },
@@ -513,11 +514,12 @@ struct NoteDetailView: View {
     @Environment(\.colorScheme) private var scheme
 
     @AppStorage("fontSize") private var fontSize = Prefs.defaultFontSize
+    @AppStorage("theme") private var theme: AppTheme = .dark
 
     @State private var pinchStart: Double?
 
     var body: some View {
-        let palette = Palette.forScheme(scheme)
+        let palette = theme.palette(scheme)
         VStack(spacing: 0) {
             TagBar(note: note, allTags: allTags, tagHexes: tagHexes, palette: palette)
             Rectangle().fill(palette.secondary.opacity(0.25)).frame(height: 1)

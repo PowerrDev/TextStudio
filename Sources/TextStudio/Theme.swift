@@ -30,13 +30,15 @@ import AppKit
 // MARK: - Appearance setting
 
 enum AppTheme: String, CaseIterable, Identifiable {
-    case system, light, dark
+    case system, light, dark, catppuccin, tokyoNight
     var id: String { rawValue }
     var label: String {
         switch self {
         case .system: "System"
         case .light: "Light"
         case .dark: "Dark"
+        case .catppuccin: "Catppuccin"
+        case .tokyoNight: "Tokyo Night"
         }
     }
 
@@ -44,7 +46,16 @@ enum AppTheme: String, CaseIterable, Identifiable {
         switch self {
         case .system: nil
         case .light: NSAppearance(named: .aqua)
-        case .dark: NSAppearance(named: .darkAqua)
+        case .dark, .catppuccin, .tokyoNight: NSAppearance(named: .darkAqua)
+        }
+    }
+
+    /** Colors for this theme. System, Light and Dark follow the effective color scheme. */
+    func palette(_ scheme: ColorScheme) -> Palette {
+        switch self {
+        case .system, .light, .dark: Palette.forScheme(scheme)
+        case .catppuccin: .catppuccin
+        case .tokyoNight: .tokyoNight
         }
     }
 
@@ -58,7 +69,7 @@ enum Prefs {
     static func clamp(_ v: Double) -> Double { min(max(v, minFontSize), maxFontSize) }
 }
 
-// MARK: - Palette (dark = Solarized Dark Vivid, matching Ghostty)
+// MARK: - Palettes (dark = Solarized Dark Vivid, matching Ghostty; plus Catppuccin Mocha and Tokyo Night)
 
 struct Palette {
     let background: Color
@@ -106,6 +117,38 @@ struct Palette {
         italic: Color(hex: 0xCB4B16),
         quoteBar: Color(hex: 0x93A1A1),
         check: Color(hex: 0x859900)
+    )
+
+    /** Catppuccin Mocha. */
+    static let catppuccin = Palette(
+        background: Color(hex: 0x1E1E2E),        /* base */
+        text: Color(hex: 0xCDD6F4),              /* text */
+        secondary: Color(hex: 0x9399B2),         /* overlay2 */
+        headings: [Color(hex: 0xF38BA8), Color(hex: 0x89B4FA), Color(hex: 0x94E2D5), Color(hex: 0xF9E2AF)],
+        accent: Color(hex: 0xCBA6F7),            /* mauve */
+        link: Color(hex: 0x89B4FA),              /* blue */
+        code: Color(hex: 0xA6E3A1),              /* green */
+        codeBackground: Color(hex: 0x181825),    /* mantle */
+        bold: Color(hex: 0xF5E0DC),              /* rosewater */
+        italic: Color(hex: 0xFAB387),            /* peach */
+        quoteBar: Color(hex: 0x585B70),          /* surface2 */
+        check: Color(hex: 0xA6E3A1)              /* green */
+    )
+
+    /** Tokyo Night (night variant). */
+    static let tokyoNight = Palette(
+        background: Color(hex: 0x1A1B26),
+        text: Color(hex: 0xC0CAF5),
+        secondary: Color(hex: 0x737AA2),
+        headings: [Color(hex: 0xF7768E), Color(hex: 0x7AA2F7), Color(hex: 0x7DCFFF), Color(hex: 0xE0AF68)],
+        accent: Color(hex: 0x7AA2F7),
+        link: Color(hex: 0x7AA2F7),
+        code: Color(hex: 0x9ECE6A),
+        codeBackground: Color(hex: 0x16161E),
+        bold: Color(hex: 0xBB9AF7),
+        italic: Color(hex: 0xFF9E64),
+        quoteBar: Color(hex: 0x3B4261),
+        check: Color(hex: 0x9ECE6A)
     )
 
     /** Light palette on white paper, with darker body text for print. */
@@ -185,11 +228,12 @@ struct WindowGlass: ViewModifier {
 struct ThemeTint: ViewModifier {
     @Environment(\.colorScheme) private var scheme
 
+    @AppStorage("theme") private var theme: AppTheme = .dark
     @AppStorage("tintOpacity") private var tintOpacity = 0.55
 
     func body(content: Content) -> some View {
         content.background {
-            Palette.forScheme(scheme).background.opacity(tintOpacity)
+            theme.palette(scheme).background.opacity(tintOpacity)
                 .ignoresSafeArea()
         }
     }

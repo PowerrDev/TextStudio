@@ -14,7 +14,7 @@ A small native macOS app for writing Markdown notes, built with SwiftUI and Swif
 - Saves automatically as you type
 - Zoom with ⌘+ / ⌘− / ⌘0 or a trackpad pinch
 - Frosted, translucent background across all three columns, with adjustable transparency
-- Light and dark themes based on Solarized (dark is Solarized Dark Vivid)
+- Light and dark themes based on Solarized (dark is Solarized Dark Vivid), plus Catppuccin (Mocha) and Tokyo Night
 - Monospaced editor font: PlemolJP Console NF, falling back to the system mono font if it isn't installed
 
 ## Requirements

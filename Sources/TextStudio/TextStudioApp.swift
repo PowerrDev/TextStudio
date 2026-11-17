@@ -174,7 +174,6 @@ struct SettingsView: View {
             Picker("Appearance", selection: $theme) {
                 ForEach(AppTheme.allCases) { Text($0.label).tag($0) }
             }
-            .pickerStyle(.segmented)
             LabeledContent("Text size") {
                 HStack {
                     Slider(value: $fontSize, in: Prefs.minFontSize...Prefs.maxFontSize, step: 1)
